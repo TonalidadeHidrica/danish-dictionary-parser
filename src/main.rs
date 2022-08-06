@@ -105,7 +105,7 @@ fn process_page(file: &pdf::file::File<Vec<u8>>, page: PageRc) -> anyhow::Result
         .as_ref()
         .context("The page does not have contents")?;
     for op in contents.operations(file)? {
-        println!("{:?}", op);
+        println!("{op:?}");
     }
     Ok(())
 }
