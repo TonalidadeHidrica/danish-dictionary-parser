@@ -9,15 +9,19 @@ use pdf::object::PageRc;
 #[derive(Parser)]
 struct Opts {
     file: PathBuf,
-    page: u32,
+    page: Option<u32>,
 }
 
 fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     let file = pdf::file::File::open(&opts.file)?;
 
-    for page in file.pages().flatten() {
-        process_page(page)?;
+    if let Some(page) = opts.page {
+        process_page(file.get_page(page)?)?;
+    } else {
+        for page in file.pages().flatten() {
+            process_page(page)?;
+        }
     }
 
     Ok(())
