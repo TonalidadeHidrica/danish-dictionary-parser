@@ -11,5 +11,5 @@ clap = { version = "3.2.16", features = ["derive"] }
 flagset = "0.4.3"
 fs-err = "2.7.0"
 itertools = "0.10.3"
-pdf = "0.7.2"
+pdf = { git = "https://github.com/pdf-rs/pdf" }
 thiserror = "1.0.32"
