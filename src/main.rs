@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::Context;
 use clap::Parser;
 
+use danish_dictionary_parser::text_parser::{TextMatrices, TextStateParams};
 use itertools::Itertools;
 use pdf::{content::Op, object::PageRc};
 
@@ -104,8 +105,49 @@ fn process_page(file: &pdf::file::File<Vec<u8>>, page: PageRc) -> anyhow::Result
         .contents
         .as_ref()
         .context("The page does not have contents")?;
+
+    let mut params = TextStateParams::default();
+    let mut positions = None;
+
     for op in contents.operations(file)? {
-        println!("{op:?}");
+        match op {
+            Op::CharSpacing { char_space } => {
+                params.set_character_spacing(char_space);
+            }
+            Op::WordSpacing { word_space } => {
+                params.set_word_spacing(word_space);
+            }
+            Op::TextScaling { horiz_scale } => {
+                params.set_horizontal_scaling(horiz_scale);
+            }
+            Op::Leading { leading } => {
+                params.set_leading(leading);
+            }
+            Op::TextFont { name, size } => {
+                params.set_font(name, size);
+            }
+            Op::TextRenderMode { mode } => {
+                params.set_rendering_mode(mode);
+            }
+            Op::TextRise { rise } => {
+                params.set_rise(rise);
+            }
+            Op::BeginText => {
+                positions = Some(TextMatrices::default());
+            }
+            Op::EndText => {
+                positions = None;
+            }
+            Op::MoveTextPosition { translation } => positions
+                .as_mut()
+                .context("BT not present before Td/TD")?
+                .next_line(translation),
+            Op::SetTextMatrix { matrix } => positions
+                .as_mut()
+                .context("BT not present before Td/TD")?
+                .set_matrix(matrix),
+            _ => {}
+        }
     }
     Ok(())
 }

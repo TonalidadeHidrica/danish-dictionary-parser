@@ -10,6 +10,8 @@ anyhow = "1.0.59"
 clap = { version = "3.2.16", features = ["derive"] }
 flagset = "0.4.3"
 fs-err = "2.7.0"
+getset = "0.1.2"
 itertools = "0.10.3"
+nalgebra = "0.31.1"
 pdf = { git = "https://github.com/pdf-rs/pdf" }
 thiserror = "1.0.32"
