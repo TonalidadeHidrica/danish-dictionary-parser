@@ -253,9 +253,8 @@ impl TryFrom<PdfOperation> for Operator {
             ("Tj", [Primitive::String(s)]) => Operator::TextShowing(TextShowingOperator::Show(
                 replace(s, PdfString::new(vec![])),
             )),
-            ("TJ", _) => Operator::TextShowing(TextShowingOperator::Adjusted(
-                operation
-                    .operands
+            ("TJ", [Primitive::Array(a)]) => Operator::TextShowing(TextShowingOperator::Adjusted(
+                take(a)
                     .into_iter()
                     .map(|p| {
                         Ok(match p {
@@ -311,7 +310,7 @@ impl TryFrom<PdfOperation> for Operator {
             ("EMC", []) => Operator::MarkedContent(MarkedContentOperator::End),
             (
                 "q" | "Q" | "w" | "re" | "n" | "W" | "BT" | "ET" | "Tc" | "Tw" | "Tf" | "Tr" | "Td"
-                | "TD" | "T*" | "Tm" | "Tj" | "CS" | "cs" | "BDC" | "EMC",
+                | "TD" | "T*" | "Tm" | "Tj" | "TJ" | "CS" | "cs" | "BDC" | "EMC",
                 _,
             ) => {
                 return Err(OperatorParseError {
@@ -338,6 +337,8 @@ impl TryFrom<&Primitive> for PdfNumber {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("{reason}")]
 pub struct OperatorParseError {
     pub reason: String,
 }
