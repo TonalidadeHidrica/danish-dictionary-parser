@@ -39,6 +39,7 @@ impl TextStateParams {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct TextMatrices {
     text_matrix: Matrix3<f32>,
     text_line_matrix: Matrix3<f32>,
