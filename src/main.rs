@@ -5,7 +5,10 @@ use clap::Parser;
 
 use danish_dictionary_parser::text_parser::{TextMatrices, TextStateParams};
 use itertools::Itertools;
-use pdf::{content::Op, object::PageRc};
+use pdf::{
+    content::{Op, TextDrawAdjusted},
+    object::PageRc,
+};
 
 #[derive(Parser)]
 struct Opts {
@@ -138,14 +141,40 @@ fn process_page(file: &pdf::file::File<Vec<u8>>, page: PageRc) -> anyhow::Result
             Op::EndText => {
                 positions = None;
             }
-            Op::MoveTextPosition { translation } => positions
-                .as_mut()
-                .context("BT not present before Td/TD")?
-                .next_line(translation),
-            Op::SetTextMatrix { matrix } => positions
-                .as_mut()
-                .context("BT not present before Td/TD")?
-                .set_matrix(matrix),
+            Op::MoveTextPosition { translation } => {
+                positions
+                    .as_mut()
+                    .context("BT not present before Td/TD")?
+                    .next_line(translation);
+            }
+            Op::SetTextMatrix { matrix } => {
+                positions
+                    .as_mut()
+                    .context("BT not present before Tm")?
+                    .set_matrix(matrix);
+            }
+            Op::TextDraw { text } => {
+                let positions = positions.as_ref().context("BT not preset beefore Tj")?;
+                let (font, _) = params.font().as_ref().context("Tf not present before Tj")?;
+                println!(
+                    "{font:?}\t{:?}\t{:?} {text:?}",
+                    positions.glyph_size(),
+                    positions.coordinates()
+                );
+            }
+            Op::TextDrawAdjusted { array } => {
+                let positions = positions.as_ref().context("BT not preset beefore TJ")?;
+                let (font, _) = params.font().as_ref().context("Tf not present before TJ")?;
+                for a in array {
+                    if let TextDrawAdjusted::Text(text) = a {
+                        println!(
+                            "{font:?}\t{:?}\t{:?} {text:?}",
+                            positions.glyph_size(),
+                            positions.coordinates()
+                        );
+                    }
+                }
+            }
             _ => {}
         }
     }

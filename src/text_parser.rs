@@ -1,8 +1,8 @@
-use getset::Setters;
-use nalgebra::Matrix3;
+use getset::{Getters, Setters};
+use nalgebra::{Matrix3, RowVector3};
 use pdf::{content::TextMode, primitive::Name};
 
-#[derive(Setters)]
+#[derive(Getters, Setters)]
 pub struct TextStateParams {
     #[getset(set = "pub")]
     character_spacing: f32,
@@ -12,6 +12,7 @@ pub struct TextStateParams {
     horizontal_scaling: f32,
     #[getset(set = "pub")]
     leading: f32,
+    #[getset(get = "pub")]
     font: Option<(Name, f32)>,
     #[getset(set = "pub")]
     rendering_mode: TextMode,
@@ -59,5 +60,13 @@ impl TextMatrices {
     pub fn set_matrix(&mut self, m: pdf::content::Matrix) {
         self.text_line_matrix = Matrix3::new(m.a, m.b, 0., m.c, m.d, 0., m.e, m.f, 1.);
         self.text_matrix = self.text_line_matrix;
+    }
+    pub fn coordinates(&self) -> (f32, f32) {
+        let ret = RowVector3::new(0., 0., 1.) * self.text_matrix;
+        (ret.x, ret.y)
+    }
+    pub fn glyph_size(&self) -> f32 {
+        let ret = RowVector3::new(0., 1., 0.) * self.text_matrix;
+        ret.y
     }
 }
