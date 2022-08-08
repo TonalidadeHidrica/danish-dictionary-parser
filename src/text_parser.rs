@@ -1,5 +1,5 @@
 use getset::{Getters, Setters};
-use nalgebra::{Matrix3, RowVector3};
+use nalgebra::{Matrix3, RowVector2, RowVector3};
 use pdf::{content::TextMode, primitive::Name};
 
 #[derive(Getters, Setters)]
@@ -62,9 +62,9 @@ impl TextMatrices {
         self.text_line_matrix = Matrix3::new(m.a, m.b, 0., m.c, m.d, 0., m.e, m.f, 1.);
         self.text_matrix = self.text_line_matrix;
     }
-    pub fn coordinates(&self) -> (f32, f32) {
+    pub fn coordinates(&self) -> RowVector2<f32> {
         let ret = RowVector3::new(0., 0., 1.) * self.text_matrix;
-        (ret.x, ret.y)
+        RowVector2::new(ret.x, ret.y)
     }
     pub fn glyph_size(&self) -> f32 {
         let ret = RowVector3::new(0., 1., 0.) * self.text_matrix;

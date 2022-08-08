@@ -12,6 +12,7 @@ flagset = "0.4.3"
 fs-err = "2.7.0"
 getset = "0.1.2"
 itertools = "0.10.3"
+maplit = "1.0.2"
 nalgebra = "0.31.1"
 ordered-float = "3.0.0"
 pdf = { git = "https://github.com/pdf-rs/pdf" }

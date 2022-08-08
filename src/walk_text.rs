@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use anyhow::{anyhow, Context};
 
 use pdf::{
@@ -122,4 +124,15 @@ pub struct TextEntry {
     pub positions: TextMatrices,
     pub font: Name,
     pub text: PdfString,
+}
+
+impl Debug for TextEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TextEntry")
+            .field("pos", &self.positions.coordinates())
+            .field("font", &self.font)
+            .field("size", &self.positions.glyph_size())
+            .field("text", &self.text)
+            .finish()
+    }
 }
