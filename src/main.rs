@@ -75,7 +75,9 @@ fn process_page(opts: &Opts, file: &pdf::file::File<Vec<u8>>, page: PageRc) -> a
         .try_collect()?;
 
     for line in lines {
-        println!("=============");
+        if opts.verbose {
+            println!("=============");
+        }
         for entry in line {
             let (font, map) = fonts
                 .get(entry.font.as_str())
@@ -112,19 +114,42 @@ fn make_unicode_map(
     file: &pdf::file::File<Vec<u8>>,
     font: &RcRef<Font>,
 ) -> anyhow::Result<HashMap<u16, String>> {
-    if font
-        .name
-        .as_ref()
-        .map_or(false, |x| x.as_str() == "DXNKCI+GaijiL")
-    {
+    match font.name.as_ref().map(|x| x.as_str()) {
         // Embedded gaiji font.  No way to get these mapping from file so we hardcode them.
-        Ok(maplit::hashmap![
-            65 => "\u{227}".into(),
-            67 => "ᒑ".into(), // similar to [j]?  no such glyph in unicode
-            68 => ";".into(), // long vowel with stød, no such glyph in unicode
-            69 => "\u{283}".into(),
-        ])
-    } else if let Some(map) = font.to_unicode(file).transpose()? {
+        Some("DXNKCI+GaijiL") => {
+            return Ok(maplit::hashmap![
+                65 => "\u{227}".into(),
+                67 => "ᒑ".into(), // similar to [j]?  no such glyph in unicode
+                68 => ";".into(), // long vowel with stød, no such glyph in unicode
+                69 => "\u{283}".into(),
+            ]);
+        }
+        // Patch IPA font that uses private use area to standard Unicode phonetic alphabet for
+        // visualization purpose.
+        Some("DXNKCI+Ipa-samdUclphon1SILDoulosL") => {
+            return Ok(maplit::hashmap![
+                // 【？】
+                4 => "ˈ".into(),
+                7 => "ˌ".into(),
+                34 => "ə".into(),
+                35 => "ɑ".into(),
+                38 => "ð".into(),
+                48 => "ŋ".into(),
+                49 => "ɔ".into(),
+                73 => "g".into(),
+                80 => "n".into(),
+                132 => "ɹ".into(),
+                186 => "\u{0329}".into(),
+                194 => "\u{030A}".into(),
+                196 => "\u{0308}".into(),
+                229 => "【？】".into(),
+                254 => "【？】".into(),
+                256 => "【？】".into(),
+            ]);
+        }
+        _ => {}
+    };
+    if let Some(map) = font.to_unicode(file).transpose()? {
         Ok(map.iter().map(|(k, v)| (k, v.into())).collect())
     } else if let (
         FontType::TrueType,
