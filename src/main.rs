@@ -1,14 +1,17 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{bail, Context};
 use clap::Parser;
 use itertools::Itertools;
-use pdf::object::PageRc;
+use pdf::{
+    font::Font,
+    object::{PageRc, RcRef},
+};
 
 use danish_dictionary_parser::{
     count_ops::count_ops,
-    decode_pdf_string::{decode_pdf_string, make_font_map},
-    walk_text::each_text,
+    decode_pdf_string::{decode_pdf_string, make_font_map, FontMap},
+    walk_text::{each_text, TextEntry},
 };
 
 #[derive(Parser)]
@@ -21,6 +24,8 @@ struct Opts {
     count: bool,
     #[clap(long)]
     verbose: bool,
+    #[clap(long)]
+    dump_lines: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -68,7 +73,18 @@ fn process_page(opts: &Opts, file: &pdf::file::File<Vec<u8>>, page: PageRc) -> a
     };
 
     let fonts = make_font_map(file, &page)?;
+    if opts.dump_lines {
+        return dump_lines(lines, opts, &fonts);
+    }
 
+    Ok(())
+}
+
+fn dump_lines(
+    lines: Vec<&[TextEntry]>,
+    opts: &Opts,
+    fonts: &HashMap<&str, (RcRef<Font>, FontMap)>,
+) -> Result<(), anyhow::Error> {
     for line in lines {
         if opts.verbose {
             println!("=============");
@@ -111,6 +127,5 @@ fn process_page(opts: &Opts, file: &pdf::file::File<Vec<u8>>, page: PageRc) -> a
         }
         println!();
     }
-
     Ok(())
 }
