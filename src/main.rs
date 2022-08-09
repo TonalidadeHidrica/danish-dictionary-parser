@@ -84,6 +84,9 @@ fn process_page(opts: &Opts, file: &pdf::file::File<Vec<u8>>, page: PageRc) -> a
                 print!("{a:}");
             }
         }
+        if !opts.verbose {
+            print!("[");
+        }
         for entry in line {
             let (font, map) = fonts
                 .get(entry.font.as_str())
@@ -102,6 +105,9 @@ fn process_page(opts: &Opts, file: &pdf::file::File<Vec<u8>>, page: PageRc) -> a
             if opts.verbose {
                 println!();
             }
+        }
+        if !opts.verbose {
+            print!("]");
         }
         println!();
     }
