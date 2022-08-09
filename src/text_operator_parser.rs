@@ -10,7 +10,7 @@ pub struct TextStateParams {
     word_spacing: f32,
     #[getset(set = "pub")]
     horizontal_scaling: f32,
-    #[getset(set = "pub")]
+    #[getset(get = "pub", set = "pub")]
     leading: f32,
     #[getset(get = "pub")]
     font: Option<(Name, f32)>,
@@ -62,6 +62,7 @@ impl TextMatrices {
         self.text_line_matrix = Matrix3::new(m.a, m.b, 0., m.c, m.d, 0., m.e, m.f, 1.);
         self.text_matrix = self.text_line_matrix;
     }
+
     pub fn coordinates(&self) -> RowVector2<f32> {
         let ret = RowVector3::new(0., 0., 1.) * self.text_matrix;
         RowVector2::new(ret.x, ret.y)

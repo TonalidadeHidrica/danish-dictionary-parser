@@ -86,6 +86,13 @@ impl Iterator for ForEachText {
                     None => return Some(Err(anyhow!("BT not present before Tm"))),
                     Some(e) => e.set_matrix(matrix),
                 },
+                Op::TextNewline => match self.positions.as_mut() {
+                    None => return Some(Err(anyhow!("BT not present before T*"))),
+                    Some(e) => e.next_line(pdf::content::Point {
+                        x: 0.0,
+                        y: -self.params.leading(),
+                    }),
+                },
                 Op::TextDraw { text } => {
                     let positions = match self.positions {
                         None => return Some(Err(anyhow!("BT not preset beefore Tj"))),
