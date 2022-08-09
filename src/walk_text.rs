@@ -8,7 +8,7 @@ use pdf::{
     primitive::{Name, PdfString},
 };
 
-use crate::text_parser::{TextMatrices, TextStateParams};
+use crate::text_operator_parser::{TextMatrices, TextStateParams};
 
 pub struct ForEachText {
     operations: std::vec::IntoIter<Op>,
