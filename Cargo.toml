@@ -16,4 +16,5 @@ maplit = "1.0.2"
 nalgebra = "0.31.1"
 ordered-float = "3.0.0"
 pdf = { git = "https://github.com/pdf-rs/pdf" }
+regex = "1.6.0"
 thiserror = "1.0.32"

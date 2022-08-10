@@ -56,6 +56,11 @@ fn make_unicode_map(
                 69 => "\u{283}".into(),
             ]);
         }
+        Some("NZLSMO+GaijiL2") => {
+            return Ok(maplit::hashmap![
+                76 => "\u{329}".into(),
+            ]);
+        }
         // Patch IPA font that uses private use area to standard Unicode phonetic alphabet for
         // visualization purpose.
         Some("DXNKCI+Ipa-samdUclphon1SILDoulosL") => {
