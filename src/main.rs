@@ -46,44 +46,60 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn process_page(opts: &Opts, file: &pdf::file::File<Vec<u8>>, page: PageRc) -> anyhow::Result<()> {
-    let entries: Vec<_> = each_text(file, &page)?.try_collect()?;
+type ParsedTextEntry = (TextEntry, Vec<String>);
+fn process_page(
+    opts: &Opts,
+    file: &pdf::file::File<Vec<u8>>,
+    page: PageRc,
+) -> anyhow::Result<Vec<Vec<ParsedTextEntry>>> {
     let lines = {
         let mut last_y = f32::INFINITY;
-        let mut last_i = None;
         let mut lines = vec![];
-        for (i, e) in entries
-            .iter()
-            .enumerate()
-            .skip_while(|e| e.1.positions.coordinates().y <= 50.0)
-        {
-            let p = e.positions.coordinates();
+        for entry in each_text(file, &page)?.skip_while(|e| {
+            e.as_ref()
+                .map_or(false, |e| e.positions.coordinates().y <= 50.0)
+        }) {
+            let entry = entry?;
+            let p = entry.positions.coordinates();
             if p.y < last_y - 8.0 {
-                // println!("{:?}", e);
                 last_y = p.y;
-                if let Some(last_i) = last_i.replace(i) {
-                    lines.push(&entries[last_i..i]);
-                }
+                lines.push(vec![entry]);
+            } else {
+                lines
+                    .last_mut()
+                    .expect("The branch above should run in the first iteration")
+                    .push(entry);
             }
-        }
-        if let Some(last_i) = last_i {
-            lines.push(&entries[last_i..]);
         }
         lines
     };
 
     let fonts = make_font_map(file, &page)?;
     if opts.dump_lines {
-        return dump_lines(lines, opts, &fonts);
+        dump_lines(opts, &fonts, &lines)?;
     }
 
-    Ok(())
+    let mut parsed_lines = vec![];
+    for line in lines {
+        let mut parsed_line = vec![];
+        for entry in line {
+            let (font, map) = fonts
+                .get(entry.font.as_str())
+                .with_context(|| format!("Font {:?} not found", entry.font))?;
+            let strings = decode_pdf_string(map, font.subtype, &entry.text)?
+                .map(|e| e.to_owned())
+                .collect_vec();
+            parsed_line.push((entry, strings));
+        }
+        parsed_lines.push(parsed_line);
+    }
+    Ok(parsed_lines)
 }
 
 fn dump_lines(
-    lines: Vec<&[TextEntry]>,
     opts: &Opts,
     fonts: &HashMap<&str, (RcRef<Font>, FontMap)>,
+    lines: &[Vec<TextEntry>],
 ) -> Result<(), anyhow::Error> {
     for line in lines {
         if opts.verbose {
@@ -91,12 +107,7 @@ fn dump_lines(
         }
         if let Some(entry) = line.get(0) {
             if !opts.verbose {
-                let a = match entry.positions.coordinates().x {
-                    x if (70.5..71.5).contains(&x) => "",
-                    x if (80.0..82.5).contains(&x) => "    ",
-                    x if (91.5..92.5).contains(&x) => "    ",
-                    x => bail!("Unexpected x coordinates: {x}"),
-                };
+                let a = if indented(entry)? { "    " } else { "" };
                 print!("{a:}");
             }
         }
@@ -128,4 +139,13 @@ fn dump_lines(
         println!();
     }
     Ok(())
+}
+
+fn indented(entry: &TextEntry) -> anyhow::Result<bool> {
+    Ok(match entry.positions.coordinates().x {
+        x if (70.5..71.5).contains(&x) => true,
+        x if (80.0..82.5).contains(&x) => false,
+        x if (91.5..92.5).contains(&x) => false,
+        x => bail!("Unexpected x coordinates: {x}"),
+    })
 }
