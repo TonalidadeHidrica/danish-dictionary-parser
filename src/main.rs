@@ -38,8 +38,24 @@ fn main() -> anyhow::Result<()> {
         process_page(&opts, &file, file.get_page(page)?)?;
     } else {
         let all_but = opts.all_but.unwrap_or(0);
+        let mut words = vec![];
         for page in file.pages().flatten().skip(all_but) {
-            process_page(&opts, &file, page)?;
+            for line in process_page(&opts, &file, page)? {
+                if indented(&line[0].0)? {
+                    words.push(String::new());
+                }
+                let word = words
+                    .last_mut()
+                    .context("Found indented line before the first line")?;
+                for (_, chars) in line {
+                    for c in chars {
+                        word.push_str(&c);
+                    }
+                }
+            }
+        }
+        for word in words {
+            println!("{word}");
         }
     }
 
