@@ -38,28 +38,47 @@ fn main() -> anyhow::Result<()> {
         process_page(&opts, &file, file.get_page(page)?)?;
     } else {
         let all_but = opts.all_but.unwrap_or(0);
-        let mut words = vec![];
-        for page in file.pages().flatten().skip(all_but) {
-            for line in process_page(&opts, &file, page)? {
-                if indented(&line[0].0)? {
-                    words.push(String::new());
-                }
-                let word = words
-                    .last_mut()
-                    .context("Found indented line before the first line")?;
-                for (_, chars) in line {
-                    for c in chars {
-                        word.push_str(&c);
-                    }
-                }
-            }
-        }
+        let pages = file.pages().skip(all_but);
+        let words = get_words(&opts, &file, pages)?;
         for word in words {
-            println!("{word}");
+            println!("[{word}]");
         }
     }
 
     Ok(())
+}
+
+fn get_words(
+    opts: &Opts,
+    file: &pdf::file::File<Vec<u8>>,
+    pages: impl Iterator<Item = pdf::error::Result<PageRc>>,
+) -> anyhow::Result<Vec<String>> {
+    let mut words = vec![];
+    for page in pages {
+        for line in process_page(opts, file, page?)? {
+            // line is guaranteed to be non-empty
+            // heading
+            if line[0].0.positions.glyph_size() > 11.0 {
+                continue;
+            }
+            // empty line
+            if line.len() == 1 && line[0].1 == [" "] {
+                continue;
+            }
+            if not_indented(&line[0].0)? {
+                words.push(String::new());
+            }
+            let word = words
+                .last_mut()
+                .context("Found indented line before the first line")?;
+            for (_, chars) in line {
+                for c in chars {
+                    word.push_str(&c);
+                }
+            }
+        }
+    }
+    Ok(words)
 }
 
 type ParsedTextEntry = (TextEntry, Vec<String>);
@@ -123,7 +142,7 @@ fn dump_lines(
         }
         if let Some(entry) = line.get(0) {
             if !opts.verbose {
-                let a = if indented(entry)? { "    " } else { "" };
+                let a = if not_indented(entry)? { "    " } else { "" };
                 print!("{a:}");
             }
         }
@@ -157,8 +176,10 @@ fn dump_lines(
     Ok(())
 }
 
-fn indented(entry: &TextEntry) -> anyhow::Result<bool> {
-    Ok(match entry.positions.coordinates().x {
+fn not_indented(first_entry: &TextEntry) -> anyhow::Result<bool> {
+    Ok(match first_entry.positions.coordinates().x {
+        // Hack: manual indentation
+        _ if first_entry.text.as_bytes() == b" " => false,
         x if (70.5..71.5).contains(&x) => true,
         x if (80.0..82.5).contains(&x) => false,
         x if (91.5..92.5).contains(&x) => false,
