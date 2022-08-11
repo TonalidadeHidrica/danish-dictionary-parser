@@ -101,6 +101,8 @@ fn main() -> anyhow::Result<()> {
             \]
             \s*
 
+            ( \[不変化\] \s* )?
+
             # Other forms
             (
                 ,\s*
@@ -187,16 +189,14 @@ fn main() -> anyhow::Result<()> {
             )*
 
             ( \(en\) )?
-            ( \[不変化\] )?
-
-            [:：]
         ",
         )?;
 
         for word in words {
-            if let Some(_res) = regex.captures(&word) {
-                // TODO
-            } else if word.chars().filter(|&c| c == '→').count() == 1 {
+            // if let Some(_res) = regex.captures(&word) {
+            //     // TODO
+            // } else
+            if word.chars().filter(|&c| c == '→').count() == 1 {
                 // TODO
             } else {
                 println!("{word}");
