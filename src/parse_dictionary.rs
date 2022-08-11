@@ -174,7 +174,7 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
                     .collect(),
             };
 
-            let entry = Entry {
+            let _entry = Entry {
                 word,
                 pos,
                 pronunciations: parse_pronuncitation_list(pronunciation),
@@ -185,7 +185,7 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
         } else if word.chars().filter(|&c| c == '→').count() == 1 {
             // TODO
         } else {
-            println!("{word}");
+            println!("{word:?}");
         }
     }
 
@@ -230,7 +230,7 @@ pub enum NounCount {
 
 #[derive(Debug)]
 pub struct OtherForm<'a> {
-    word: &'a str,
-    pronunciations: Vec<&'a str>,
-    slahsed: Vec<OtherForm<'a>>,
+    pub word: &'a str,
+    pub pronunciations: Vec<&'a str>,
+    pub slahsed: Vec<OtherForm<'a>>,
 }

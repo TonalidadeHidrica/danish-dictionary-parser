@@ -14,8 +14,6 @@ use danish_dictionary_parser::{
     parse_dictionary::parse_dictionary,
     walk_text::{each_text, TextEntry},
 };
-use regex::Regex;
-
 #[derive(Parser)]
 struct Opts {
     file: PathBuf,
