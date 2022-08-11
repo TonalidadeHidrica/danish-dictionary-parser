@@ -60,6 +60,15 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
         "
     );
     let other_forms_regex = Regex::new(&other_forms)?;
+    let other_adjective_forms = format!(
+        r"(?x)
+            ,\s*
+            (?P<oaf_word> {heading_words} )
+            ( \s* \[ (?P<oaf_pronunciation> {pronunciation_list} ) \] \s* )?
+            (?P<oaf_slashed> (/ {heading_words} )* ) \s*
+        "
+    );
+    let other_adjective_forms_regex = Regex::new(&other_adjective_forms)?;
     let entry_pattern = format!(
         r"(?x)
             ^
@@ -80,10 +89,7 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
 
             (?P<other_forms> ( {other_forms} )* )
 
-            (?P<other_adjective_forms> (
-                ,\s*
-                {heading_words} (/ {heading_words} )* \s*
-            )*)
+            (?P<other_adjective_forms> ( {other_adjective_forms} )*)
 
             ( \(en\) )?
 
@@ -94,12 +100,12 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
 
     for word in words {
         #[allow(clippy::if_same_then_else)]
-        if let Some(res) = regex.captures(word) {
+        if let Some(res) = regex.captures(patch(word)) {
             let word = &res["word"];
             let pos = res.name("pos").map(|x| x.as_str());
             let pronunciation = &res["pronunciation"];
             let invariant_adjective = res.name("invariant_adjective").is_some();
-            let other_forms = res.name("other_forms").map(|x| x.as_str());
+            let other_forms = &res["other_forms"];
             let other_adjective_forms = &res["other_adjective_forms"];
 
             let comma = &[',', '，'];
@@ -138,8 +144,9 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
                 v.collect()
             });
 
-            let other_forms = other_forms.map_or_else(Vec::new, |other_forms| {
-                let v = other_forms_regex.captures_iter(other_forms).map(|res| {
+            let other_forms = other_forms_regex
+                .captures_iter(other_forms)
+                .map(|res| {
                     let word = res.name("of_word").unwrap().as_str();
                     let pronunciation = res.name("of_pronunciation").unwrap().as_str();
                     let slahsed = res.name("of_slashed").map_or_else(Vec::new, |pairs| {
@@ -162,17 +169,35 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
                         pronunciations: parse_pronuncitation_list(pronunciation),
                         slahsed,
                     }
-                });
-                v.collect()
-            });
+                })
+                .collect();
 
-            let other_adjective_forms = match other_adjective_forms {
-                "" => vec![],
-                a => a
-                    .split(',')
-                    .map(|s| s.split('/').map(str::trim).collect_vec())
-                    .collect(),
-            };
+            let other_adjective_forms = other_adjective_forms_regex
+                .captures_iter(other_adjective_forms)
+                .map(|res| {
+                    let word = res.name("oaf_word").unwrap().as_str();
+                    let pronunciations = res
+                        .name("oaf_pronunciation")
+                        .map_or_else(Vec::new, |s| parse_pronuncitation_list(s.as_str()));
+                    let slahsed = res
+                        .name("oaf_slashed")
+                        .unwrap()
+                        .as_str()
+                        .split('/')
+                        .skip(1)
+                        .map(|s| OtherForm {
+                            word: s.trim(),
+                            pronunciations: vec![],
+                            slahsed: vec![],
+                        })
+                        .collect();
+                    OtherForm {
+                        word,
+                        pronunciations,
+                        slahsed,
+                    }
+                })
+                .collect();
 
             let _entry = Entry {
                 word,
@@ -181,11 +206,11 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
                 other_forms,
                 other_adjective_forms,
             };
-            // println!("{entry:#?}");
+            println!("{_entry:#?}");
         } else if word.chars().filter(|&c| c == '→').count() == 1 {
             // TODO
         } else {
-            println!("{word:?}");
+            // println!("        {word:?} => {word:?},");
         }
     }
 
@@ -202,7 +227,7 @@ pub struct Entry<'a> {
     pub pos: Vec<Pos>,
     pub pronunciations: Vec<&'a str>,
     pub other_forms: Vec<OtherForm<'a>>,
-    pub other_adjective_forms: Vec<Vec<&'a str>>,
+    pub other_adjective_forms: Vec<OtherForm<'a>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -233,4 +258,41 @@ pub struct OtherForm<'a> {
     pub word: &'a str,
     pub pronunciations: Vec<&'a str>,
     pub slahsed: Vec<OtherForm<'a>>,
+}
+
+pub fn patch(s: &str) -> &str {
+    match s {
+        "altså [副] [ˈal’sɔ, ˈαl’sɔ] すなわち，それゆえに，したがって，つまり，ようするに；〔話し手の心的態度を表す文副詞〕［意味を強めて］ほんとうに，まったく；［驚きを表して］なんと！；［遺憾，不満，苛立ち；非難・咎めを表して］ほんとうに，いいかげん（に）；［相手の言ったことに対して，相手の計画等の変更を促して］（…ということなのですが，それでもあなたは…するのですか？）；［間投詞的に用いられて，いらだち，非難，没頭など様々な感情を表す（特に話しことばにおいて）］あのねえ！，いいかい！，いやはや！，やれやれ！，これは驚いた！ " => "altså [副] [ˈal’sɔ, ˈαl’sɔ] すなわち，それゆえに，したがって，つまり，ようするに；〔話し手の心的態度を表す文副詞〕［意味を強めて］ほんとうに，まったく；［驚きを表して］なんと！；［遺憾，不満，苛立ち；非難・咎めを表して］ほんとうに，いいかげん（に）；［相手の言ったことに対して，相手の計画等の変更を促して］（…ということなのですが，それでもあなたは…するのですか？）；［間投詞的に用いられて，いらだち，非難，没頭など様々な感情を表す（特に話しことばにおいて）］あのねえ！，いいかい！，いやはや！，やれやれ！，これは驚いた！ ",
+        "Amager [固] [ˈαˌmα;] アマー［地名：コペンハーゲン南部の島．Kastrup空港がある］． " => "Amager [固] [ˈαˌmα;] アマー［地名：コペンハーゲン南部の島．Kastrup空港がある］． ",
+        "Amaliegade [固] [aˈmȧ;ljənˌgȧ:ðə] アメーリェゲーゼ［通り：コペンハーゲン］． " => "Amaliegade [固] [aˈmȧ;ljənˌgȧ:ðə] アメーリェゲーゼ［通り：コペンハーゲン］． ",
+        "Amalienborg [固] [aˈmȧ;ljənˌbɑ\u{30a}’] アメーリェンボー［王宮：コペンハーゲン］． " => "Amalienborg [固] [aˈmȧ;ljənˌbɑ\u{30a}’] アメーリェンボー［王宮：コペンハーゲン］． ",
+        "De [ˈdi, di] [代] [ˈdi, di], Dem [ˈdæm, dæm], Deres [ˈdȧɹɔs, ˈdȧ:ɔs, dȧɔs]:［人称代名詞２人称単数・複数］［フォーマルな関係の人に対して用いる］あなた，あなた方． " => "De [ˈdi, di] [代] [ˈdi, di], Dem [ˈdæm, dæm], Deres [ˈdȧɹɔs, ˈdȧ:ɔs, dȧɔs]:［人称代名詞２人称単数・複数］［フォーマルな関係の人に対して用いる］あなた，あなた方． ",
+        "de [ˈdi, di] [代] [ˈdi, di], dem [ˈdæm, dæm], deres [ˈdȧɹɔs, ˈdȧ:ɔs, dȧɔs]:［人称代名詞３人称複数］彼ら，彼女ら，それら；［不定代名詞］(一般の)人々，みんな；権威，当局；［指示代名詞］［人・動物・もの・ことを指して］あれら(の)，それら(の)；(…する・である)人たち・もの． " => "de [ˈdi, di] [代] [ˈdi, di], dem [ˈdæm, dæm], deres [ˈdȧɹɔs, ˈdȧ:ɔs, dȧɔs]:［人称代名詞３人称複数］彼ら，彼女ら，それら；［不定代名詞］(一般の)人々，みんな；権威，当局；［指示代名詞］［人・動物・もの・ことを指して］あれら(の)，それら(の)；(…する・である)人たち・もの． ",
+        "den1 [ˈdæn’, dæn] [代] [ˈdæn’, dæn], dens [ˈdæn(’)s, dæns], det [ˈde, de],  dets [ˈdæds, dæds], de [ˈdi, di], dem [ˈdæm, dæm], deres [ˈdȧɹɔs, ˈdȧ:ɔs, dȧɔs]:［人称代名詞３人称］［すでに述べた動物・もの・ことに参照して］それ；［指示代名詞］［人・動物・もの・ことを指して］あれ，それ；あの，その；前者の；前者． " => "den1 [ˈdæn’, dæn] [代] [ˈdæn’, dæn], dens [ˈdæn(’)s, dæns], det [ˈde, de],  dets [ˈdæds, dæds], de [ˈdi, di], dem [ˈdæm, dæm], deres [ˈdȧɹɔs, ˈdȧ:ɔs, dȧɔs]:［人称代名詞３人称］［すでに述べた動物・もの・ことに参照して］それ；［指示代名詞］［人・動物・もの・ことを指して］あれ，それ；あの，その；前者の；前者． ",
+        "en2 [数] [ˈe;n] et [ˈed]: 一，1つ，1人，1個 " => "en2 [数] [ˈe;n] et [ˈed]: 一，1つ，1人，1個 ",
+        "firsindstyvende [数] [ˈfiɹ’sənsˈty:vənə] 第八十番目の． " => "firsindstyvende [数] [ˈfiɹ’sənsˈty:vənə] 第八十番目の． ",
+        "Frederiksborg Slot [固] [fræðrægsˈbɑ\u{30a};ˈslɔd] フレズレクスボー城［北シェランにある城］ " => "Frederiksborg Slot [固] [fræðrægsˈbɑ\u{30a};ˈslɔd] フレズレクスボー城［北シェランにある城］ ",
+        "græker [名] [ˈgræ;gɔ], grækeren [ˈgræ;gɔɔn], grækere [ˈgræ;gɔɔ],  grækerne [ˈgræ;gɔnə], ギリシア人 " => "græker [名] [ˈgræ;gɔ], grækeren [ˈgræ;gɔɔn], grækere [ˈgræ;gɔɔ],  grækerne [ˈgræ;gɔnə], ギリシア人 ",
+        "halvfemsindstyvende [数] [halˈfæm’sənsˈty:vənə, halˈfæm’sənsˈty:wənə] 第九十番目の． " => "halvfemsindstyvende [数] [halˈfæm’sənsˈty:vənə, halˈfæm’sənsˈty:wənə] 第九十番目の． ",
+        "halvfjerdsindstyvende [数] [halˈfjȧɹsənsˈty:vənə, halˈfjȧɹsənsˈty:wənə] 第七十番目の． " => "halvfjerdsindstyvende [数] [halˈfjȧɹsənsˈty:vənə, halˈfjȧɹsənsˈty:wənə] 第七十番目の． ",
+        "halvtredsindstyvende [数] [ˈtræsənsˈty:vənə, ˈtræsənsˈty:wənə] 第五十番目の． " => "halvtredsindstyvende [数] [ˈtræsənsˈty:vənə, ˈtræsənsˈty:wənə] 第五十番目の． ",
+        "have1 [名] [ˈhȧ:və, ˈhȧ:wə], haven [[ˈhȧ:vən, ˈhȧ:wən], haver [ˈhȧ:vɔ, ˈhȧ:wɔ],  haverne [ˈhȧ:vɔnə, ˈhȧ:wɔnə]: 庭，庭園，公園． " => "have1 [名] [ˈhȧ:və, ˈhȧ:wə], haven [[ˈhȧ:vən, ˈhȧ:wən], haver [ˈhȧ:vɔ, ˈhȧ:wɔ],  haverne [ˈhȧ:vɔnə, ˈhȧ:wɔnə]: 庭，庭園，公園． ",
+        "hof [名] [ˈhɔf] en, hoffer [ˈhɔfɔ]: デンマークのビール会社カールスベア社 (Carlsberg) のラガービールの愛称． " => "hof [名] [ˈhɔf] en, hoffer [ˈhɔfɔ]: デンマークのビール会社カールスベア社 (Carlsberg) のラガービールの愛称． ",
+        "hun [代] [ˈhun, hun] hende [ˈhenə, henə], hendes [ˈhenəs, henəs]:［人称代名詞３人称単数女性］彼女． " => "hun [代] [ˈhun, hun] hende [ˈhenə, henə], hendes [ˈhenəs, henəs]:［人称代名詞３人称単数女性］彼女． ",
+        "hvem [代] [ˈvæm’],［所有格］hvis [ˈves]:［疑問代名詞］誰・どの人・どんな人(が・を・に)；［関係代名詞］［人を表す先行詞を受けて］…するところの(人)［現在では，この用法では，hvemが関係節中の主語になることはない］；［先行詞を含む不定関係代名詞］(…する)だれでも，どんな人でも． " => "hvem [代] [ˈvæm’],［所有格］hvis [ˈves]:［疑問代名詞］誰・どの人・どんな人(が・を・に)；［関係代名詞］［人を表す先行詞を受けて］…するところの(人)［現在では，この用法では，hvemが関係節中の主語になることはない］；［先行詞を含む不定関係代名詞］(…する)だれでも，どんな人でも． ",
+        "jeg [代] [ˈjα(ᒑ), jα(ᒑ)] mig [ˈmαᒑ, mα(ᒑ)]:［人称代名詞１人称単数］私，僕． " => "jeg [代] [ˈjα(ᒑ), jα(ᒑ)] mig [ˈmαᒑ, mα(ᒑ)]:［人称代名詞１人称単数］私，僕． ",
+        "klejne [名] [ˈklαᒑnə], klejnen [名] [ˈklαᒑnən], klejner [ˈklαᒑnɔ], klejner [ˈklαᒑnɔnə]: クライネ（特にクリスマスの時期に食する，ねじりドーナッツ）． " => "klejne [名] [ˈklαᒑnə], klejnen [名] [ˈklαᒑnən], klejner [ˈklαᒑnɔ], klejner [ˈklαᒑnɔnə]: クライネ（特にクリスマスの時期に食する，ねじりドーナッツ）． ",
+        "knuse [動] [ˈknu:sə], knuser [ˈknu;sɔ], knuste [ˈknu:sdə], knust [ˈknu;sd],  knusende [ˈknu:sənə], knus\u{f022} [ˈknu;s]: 壊す，こなごなにする，砕く． " => "knuse [動] [ˈknu:sə], knuser [ˈknu;sɔ], knuste [ˈknu:sdə], knust [ˈknu;sd],  knusende [ˈknu:sənə], knus\u{f022} [ˈknu;s]: 壊す，こなごなにする，砕く． ",
+        "lille [形] [ˈlilə]［性，既知/未知を問わず，名詞の単数形とともに］, små [små;] [性，既知/未知を問わず，名詞の複数形とともに]，mindre [ˈmendrɔ], mindst [ˈmen’sd], mindste [ˈmen’sdə]: 小さな． " => "lille [形] [ˈlilə]［性，既知/未知を問わず，名詞の単数形とともに］, små [små;] [性，既知/未知を問わず，名詞の複数形とともに]，mindre [ˈmendrɔ], mindst [ˈmen’sd], mindste [ˈmen’sdə]: 小さな． ",
+        "Louisiana [固] [luisiˈana] ルイスィアナ美術館［北シェランのホムレベク(Humlebæk) にある美術館］． " => "Louisiana [固] [luisiˈana] ルイスィアナ美術館［北シェランのホムレベク(Humlebæk) にある美術館］． ",
+        "O.k. [間] [ˈåwˈkæᒑ]/[ˈo;ˈkå;]: OK，了解，わかりました " => "O.k. [間] [ˈåwˈkæᒑ]/[ˈo;ˈkå;]: OK，了解，わかりました ",
+        "Samsø [固] [ˈsαmˌsø;] サムスー島． " => "Samsø [固] [ˈsαmˌsø;] サムスー島． ",
+        "snitte [動] [ˈsnidə], snitter [ˈsnidɔ], snittede [ˈsnidəðə], snittet [ˈsnidəð],  snittende [ˈsnidənə], snit!] [ˈsnid]: (木などを)ナイフで少し削る；彫る，刻む；細かく・薄く切る． " => "snitte [動] [ˈsnidə], snitter [ˈsnidɔ], snittede [ˈsnidəðə], snittet [ˈsnidəð],  snittende [ˈsnidənə], snit!] [ˈsnid]: (木などを)ナイフで少し削る；彫る，刻む；細かく・薄く切る． ",
+        "spændende [形] [ˈsbænənə] [不変化], , mere spændende, mest spændende: 面白い；わくわくする；スリリングな． " => "spændende [形] [ˈsbænənə] [不変化], , mere spændende, mest spændende: 面白い；わくわくする；スリリングな． ",
+        "tuborg [名] [ˈtuˌbɑ;] en, tuborg [ˈtuˌbɑ;]: かつてはビール会社トゥボー社が生産し，現在はカールスベア社が生産しているラガービールgrøm tuborgの愛称． " => "tuborg [名] [ˈtuˌbɑ;] en, tuborg [ˈtuˌbɑ;]: かつてはビール会社トゥボー社が生産し，現在はカールスベア社が生産しているラガービールgrøm tuborgの愛称． ",
+        "varm [形] [ˈvα;m], varmt [ˈvα;md], varme [ˈvα:mə], varmere [ˈvα:mɔɔ],  varmest [ˈvα:məsd], varmeste [ˈvα:məsdə];温かい，暖かい；やや暑い；熱い；思いやりのある，心のこもった． " => "varm [形] [ˈvα;m], varmt [ˈvα;md], varme [ˈvα:mə], varmere [ˈvα:mɔɔ],  varmest [ˈvα:məsd], varmeste [ˈvα:məsdə];温かい，暖かい；やや暑い；熱い；思いやりのある，心のこもった． ",
+        "vid [形] [ˈvi;ð], vidt [ˈvid], vide [形] [ˈvi:ðə], videre [ˈvi:ðɔɔ, videst [ˈvi:ðəsd],  videste [ˈvi:ðəsdə]: 広い，広大な，広々とした；遠い，遠く離れた． " => "vid [形] [ˈvi;ð], vidt [ˈvid], vide [形] [ˈvi:ðə], videre [ˈvi:ðɔɔ, videst [ˈvi:ðəsd],  videste [ˈvi:ðəsdə]: 広い，広大な，広々とした；遠い，遠く離れた． ",
+        "øre1 [名] [ˈø:ɔ], øret [ˈø:ɔð], ører [ˈø:ɔ](/øren [ˈø:ɔn]), ørerne [ˈø:ɔnə]: 耳． " => "øre1 [名] [ˈø:ɔ], øret [ˈø:ɔð], ører [ˈø:ɔ](/øren [ˈø:ɔn]), ørerne [ˈø:ɔnə]: 耳． ",
+        _ => s,
+    }
 }
