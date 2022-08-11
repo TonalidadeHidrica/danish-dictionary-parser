@@ -17,12 +17,14 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
         "
     );
     let pos = r"(?x)
-            [\[［](
-                名(・[単複])?
-                | 固 | 代 | 数 | 形 | 動 | 副 | 前 | 接 | 間
-                | 不定詞マーカー | 冠 | 不定冠詞 | 形式主語
-            )[\]］]
-            | \[形\]\s*\[無変化\]
+            (
+                [\[［](
+                    名(・[単複])?
+                    | 固 | 代 | 数 | 形 | 動 | 副 | 前 | 接 | 間
+                    | 不定詞マーカー | 冠 | 不定冠詞 | 形式主語
+                )[\]］]
+                | \[形\]\s*\[無変化\]
+            )
         ";
     let pronunciation = r"(?x)
             ([
@@ -37,10 +39,7 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
     let pronunciation_list = format!(
         r"(?x)
             {pronunciation}
-            (
-                [,，]\s*
-                {pronunciation}
-            )*
+            ([,，]\s* {pronunciation} )*
         "
     );
     let word_and_pronunciation = format!(
@@ -77,7 +76,7 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
 
             \[ (?P<pronunciation> {pronunciation_list} ) \] \s*
 
-            (?P<invariant_adjective> \[不変化\] \s* )?
+            (?P<invariant_adjective> [\[［] 不変化 [\]］] \s* )?
 
             (?P<other_forms> ( {other_forms} )* )
 
@@ -88,7 +87,7 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
 
             ( \(en\) )?
 
-            [::]
+            [:：]
         "
     );
     let regex = Regex::new(&entry_pattern)?;
@@ -182,11 +181,11 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
                 other_forms,
                 other_adjective_forms,
             };
-            println!("{entry:#?}");
+            // println!("{entry:#?}");
         } else if word.chars().filter(|&c| c == '→').count() == 1 {
             // TODO
         } else {
-            // println!("{word}");
+            println!("{word}");
         }
     }
 
