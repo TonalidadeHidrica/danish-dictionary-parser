@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{bail, Context};
 use clap::Parser;
+use fs_err::File;
 use itertools::Itertools;
 use pdf::{
     font::Font,
@@ -17,6 +18,8 @@ use danish_dictionary_parser::{
 #[derive(Parser)]
 struct Opts {
     file: PathBuf,
+    output_file: Option<PathBuf>,
+    #[clap(long)]
     page: Option<u32>,
     #[clap(long)]
     all_but: Option<usize>,
@@ -40,7 +43,10 @@ fn main() -> anyhow::Result<()> {
         let all_but = opts.all_but.unwrap_or(0);
         let pages = file.pages().skip(all_but);
         let words = get_words(&opts, &file, pages)?;
-        parse_dictionary(&words)?;
+        let entries = parse_dictionary(&words)?;
+        if let Some(path) = &opts.output_file {
+            serde_json::to_writer(File::create(path)?, &entries)?;
+        }
     }
 
     Ok(())

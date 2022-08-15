@@ -1,8 +1,9 @@
 use anyhow::bail;
 use itertools::Itertools;
 use regex::Regex;
+use serde::{Serialize, Deserialize};
 
-pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
+pub fn parse_dictionary(words: &[String]) -> anyhow::Result<Vec<Entry>> {
     let extended_word_chars = r"[a-zA-Z7éøæåØÆÅ\-.,’()/＝]+";
     let extended_heading_words = format!(
         r"(?x)
@@ -100,15 +101,17 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
     );
     let regex = Regex::new(&entry_pattern)?;
 
+    let mut ret = vec![];
+
     for word in words {
         #[allow(clippy::if_same_then_else)]
         if let Some(res) = regex.captures(patch(word)) {
-            let word = &res["word"];
+            let word = res.name("word").unwrap().as_str();
             let pos = res.name("pos").map(|x| x.as_str());
-            let pronunciation = &res["pronunciation"];
+            let pronunciation = res.name("pronunciation").unwrap().as_str();
             let invariant_adjective = res.name("invariant_adjective").is_some();
-            let other_forms = &res["other_forms"];
-            let other_adjective_forms = &res["other_adjective_forms"];
+            let other_forms = res.name("other_forms").unwrap().as_str();
+            let other_adjective_forms = res.name("other_adjective_forms").unwrap().as_str();
 
             let comma = &[',', '，'];
             let pos = pos.map_or_else(Vec::new, |pos| {
@@ -201,14 +204,13 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
                 })
                 .collect();
 
-            let _entry = Entry {
+            ret.push(Entry {
                 word,
                 pos,
                 pronunciations: parse_pronuncitation_list(pronunciation),
                 other_forms,
                 other_adjective_forms,
-            };
-            println!("{_entry:#?}");
+            });
         } else if word.chars().filter(|&c| c == '→').count() == 1 {
             // TODO
         } else {
@@ -216,14 +218,14 @@ pub fn parse_dictionary(words: &[String]) -> anyhow::Result<()> {
         }
     }
 
-    Ok(())
+    Ok(ret)
 }
 
 fn parse_pronuncitation_list(s: &str) -> Vec<&str> {
     s.split(',').map(str::trim).collect()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Entry<'a> {
     pub word: &'a str,
     pub pos: Vec<Pos>,
@@ -232,7 +234,7 @@ pub struct Entry<'a> {
     pub other_adjective_forms: Vec<OtherForm<'a>>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Pos {
     Noun(Option<NounCount>),
     ProperNoun,
@@ -249,13 +251,13 @@ pub enum Pos {
     IndefiniteArticle,
     FormalSubject,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum NounCount {
     Single,
     Multiple,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OtherForm<'a> {
     pub word: &'a str,
     pub pronunciations: Vec<&'a str>,
