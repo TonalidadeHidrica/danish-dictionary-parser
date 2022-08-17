@@ -1,7 +1,7 @@
 use anyhow::bail;
 use itertools::Itertools;
 use regex::Regex;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub fn parse_dictionary(words: &[String]) -> anyhow::Result<Vec<Entry>> {
     let extended_word_chars = r"[a-zA-Z7éøæåØÆÅ\-.,’()/＝]+";
@@ -234,7 +234,7 @@ pub struct Entry<'a> {
     pub other_adjective_forms: Vec<OtherForm<'a>>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Pos {
     Noun(Option<NounCount>),
     ProperNoun,
@@ -251,7 +251,7 @@ pub enum Pos {
     IndefiniteArticle,
     FormalSubject,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum NounCount {
     Single,
     Multiple,
